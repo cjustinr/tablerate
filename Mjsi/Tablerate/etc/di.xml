@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <!-- <preference for="\Magento\OfflineShipping\Model\Carrier\Tablerate" type="Mjsi\Tablerate\Model\Carrier\Tablerate" /> -->
+    
+    <preference for="\Magento\OfflineShipping\Model\ResourceModel\Carrier\Tablerate\CSV\RowParser" type="Mjsi\Tablerate\Model\ResourceModel\Carrier\Tablerate\CSV\RowParser" />
+
+    <!-- <type name="Magento\OfflineShipping\Model\ResourceModel\Carrier\Tablerate\CSV\RowParser">
+        <plugin name="save_custom_condition_parser" type="Mjsi\Tablerate\Plugin\Model\ResourceModel\Carrier\Tablerate\CSV\RowParser" ortOrder='1' disabled='false' />
+    </type> -->
+
+    <!-- <type name='\Magento\OfflineShipping\Model\Carrier\Tablerate'>
+        <plugin name='Custom_Tablerate' type='Mjsi\Tablerate\Plugin\Carrier\Tablerate' sortOrder='10' disabled='false'  />
+    </type> -->
+</config>

@@ -4,24 +4,65 @@ namespace Mjsi\Tablerate\Model\ResourceModel\Carrier\Tablerate\CSV;
 
 use Magento\Framework\Phrase;
 use Magento\OfflineShipping\Model\ResourceModel\Carrier\Tablerate\LocationDirectory;
+use Magento\OfflineShipping\Model\ResourceModel\Carrier\Tablerate\CSV\ColumnResolver;
+use Magento\OfflineShipping\Model\ResourceModel\Carrier\Tablerate\CSV\ColumnResolverFactory;
+use \Magento\Catalog\Model\ProductFactory;
+use Magento\OfflineShipping\Model\ResourceModel\Carrier\Tablerate\CSV\RowException;
 
 class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tablerate\CSV\RowParser
 {
-
     /**
      * @var LocationDirectory
      */
     private $locationDirectory;
 
+    private $productFactory;
+    
+
     /**
      * RowParser constructor.
      * @param LocationDirectory $locationDirectory
      */
-    public function __construct(LocationDirectory $locationDirectory)
-    {
+    public function __construct(
+        LocationDirectory $locationDirectory,
+        \Magento\Catalog\Model\ProductFactory $productFactory
+    ) {
         $this->locationDirectory = $locationDirectory;
+        $this->productFactory = $productFactory;
     }
 
+    /**
+     * Retrieve columns.
+     *
+     * @return array
+     */
+    public function getColumns()
+    {
+        return [
+            'website_id',
+            'dest_country_id',
+            'dest_region_id',
+            'dest_zip',
+            'condition_name',
+            'condition_value',
+            'price',
+            'sku',
+        ];
+    }
+
+    /**
+     * Parse provided row data.
+     *
+     * @param array $rowData
+     * @param int $rowNumber
+     * @param int $websiteId
+     * @param string $conditionShortName
+     * @param string $conditionFullName
+     * @param ColumnResolver $columnResolver
+     * @return array
+     * @throws ColumnNotFoundException
+     * @throws RowException
+     */
     public function parse(
         $rowData,
         $rowNumber,
@@ -30,6 +71,8 @@ class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tab
         $conditionFullName,
         $columnResolver
     ) {
+
+        
         // validate row
         if (count($rowData) < 5) {
             throw new RowException(
@@ -47,21 +90,52 @@ class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tab
         $price = $this->getPrice($rowData, $rowNumber, $columnResolver);
 
         $rates = [];
-        foreach ($regionIds as $regionId) {
-            $rates[] = [
-                'website_id' => $websiteId,
-                'dest_country_id' => $countryId,
-                'dest_region_id' => $regionId,
-                'dest_zip' => $zipCode,
-                'condition_name' => $conditionShortName,
-                'condition_value' => $conditionValue,
-                'price' => $price,
-            ];
-        }
 
+        if ($conditionFullName == 'Item SKU') {
+            try {
+                $product = $this->productFactory->create();
+                $productPriceBySku = $product->loadByAttribute('sku', $conditionValue)->getPrice();
+            } catch (\Throwable $th) {
+                throw new RowException(
+                    __(
+                        'This item sku "%2" does not exist, Row #%3.',
+                        $conditionFullName,
+                        $conditionValue,
+                        $rowNumber
+                    )
+                );
+            }
+
+            foreach ($regionIds as $regionId) {
+                $rates[] = [
+                    'website_id' => $websiteId,
+                    'dest_country_id' => $countryId,
+                    'dest_region_id' => $regionId,
+                    'dest_zip' => $zipCode,
+                    'condition_name' => $conditionShortName,
+                    'condition_value' => 0.0000,
+                    'price' => $price,
+                    'sku' => $conditionValue,
+                ];
+            }
+        }else{
+            foreach ($regionIds as $regionId) {
+                $rates[] = [
+                    'website_id' => $websiteId,
+                    'dest_country_id' => $countryId,
+                    'dest_region_id' => $regionId,
+                    'dest_zip' => $zipCode,
+                    'condition_name' => $conditionShortName,
+                    'condition_value' => $conditionValue,
+                    'price' => $price,
+                    'sku' => NULL,
+                ];
+            }
+        }
+        
         return $rates;
     }
-    
+
     /**
      * Get country id from provided row data.
      *
@@ -72,21 +146,17 @@ class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tab
      * @throws ColumnNotFoundException
      * @throws RowException
      */
-    private function getCountryId($rowData, $rowNumber,$columnResolver)
+    private function getCountryId($rowData, $rowNumber, $columnResolver)
     {
         
         $countryCode = $columnResolver->getColumnValue(ColumnResolver::COLUMN_COUNTRY, $rowData);
-        print_r('ahahhahaha');
-        die; 
+        /* print_r($this->locationDirectory->hasCountryId($countryCode));
+        die; */
         // validate country
         if ($this->locationDirectory->hasCountryId($countryCode)) {
-            print_r('Country hahaha 1');
-        die;
             $countryId = $this->locationDirectory->getCountryId($countryCode);
         } elseif ($countryCode === '*' || $countryCode === '') {
             $countryId = '0';
-            print_r('Country hahaha 2');
-        die;
         } else {
             throw new RowException(
                 __(
@@ -95,8 +165,6 @@ class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tab
                     $rowNumber
                 )
             );
-            print_r('Country hahaha 3');
-        die;
         }
         
         return $countryId;
@@ -113,12 +181,9 @@ class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tab
      * @throws ColumnNotFoundException
      * @throws RowException
      */
-    private function getRegionIds($rowData, $rowNumber, $columnResolver, $countryId)
+    private function getRegionIds(array $rowData, $rowNumber, ColumnResolver $columnResolver, $countryId)
     {
-        
         $regionCode = $columnResolver->getColumnValue(ColumnResolver::COLUMN_REGION, $rowData);
-        print_r('Region hahaha');
-        die;
         if ($countryId !== '0' && $this->locationDirectory->hasRegionId($countryId, $regionCode)) {
             $regionIds = $this->locationDirectory->getRegionIds($countryId, $regionCode);
         } elseif ($regionCode === '*' || $regionCode === '') {
@@ -144,7 +209,7 @@ class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tab
      * @return float|int|null|string
      * @throws ColumnNotFoundException
      */
-    private function getZipCode($rowData, $columnResolver)
+    private function getZipCode(array $rowData, ColumnResolver $columnResolver)
     {
         $zipCode = $columnResolver->getColumnValue(ColumnResolver::COLUMN_ZIP, $rowData);
         if ($zipCode === '') {
@@ -164,14 +229,16 @@ class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tab
      * @throws ColumnNotFoundException
      * @throws RowException
      */
-    private function getConditionValue($rowData, $rowNumber, $conditionFullName, $columnResolver)
+    private function getConditionValue(array $rowData, $rowNumber, $conditionFullName, ColumnResolver $columnResolver)
     {
-        print_r($conditionFullName);
-        die;
         // validate condition value
         $conditionValue = $columnResolver->getColumnValue($conditionFullName, $rowData);
-        $value = $this->_parseDecimalValue($conditionValue);
-       
+        if ($conditionFullName != 'Item SKU') {
+            $value = $this->_parseDecimalValue($conditionValue);
+        }else {
+            $value = $conditionValue;
+        }
+        
         if ($value === false) {
             throw new RowException(
                 __(
@@ -182,7 +249,7 @@ class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tab
                 )
             );
         }
-        
+
         return $value;
     }
 
@@ -196,7 +263,7 @@ class RowParser extends \Magento\OfflineShipping\Model\ResourceModel\Carrier\Tab
      * @throws ColumnNotFoundException
      * @throws RowException
      */
-    private function getPrice($rowData, $rowNumber, $columnResolver)
+    private function getPrice(array $rowData, $rowNumber, ColumnResolver $columnResolver)
     {
         $priceValue = $columnResolver->getColumnValue(ColumnResolver::COLUMN_PRICE, $rowData);
         $price = $this->_parseDecimalValue($priceValue);

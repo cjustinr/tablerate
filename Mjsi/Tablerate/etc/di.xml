@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
-    <!-- <preference for="\Magento\OfflineShipping\Model\Carrier\Tablerate" type="Mjsi\Tablerate\Model\Carrier\Tablerate" /> -->
+    <preference for="\Magento\OfflineShipping\Model\Carrier\Tablerate" type="Mjsi\Tablerate\Model\Carrier\Tablerate" />
     
     <preference for="\Magento\OfflineShipping\Model\ResourceModel\Carrier\Tablerate\CSV\RowParser" type="Mjsi\Tablerate\Model\ResourceModel\Carrier\Tablerate\CSV\RowParser" />
 
